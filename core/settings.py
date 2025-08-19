@@ -136,3 +136,34 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #        'rest_framework.permissions.IsAuthenticated',
 #     ],  
 # }
+
+
+
+LOGGING = {
+    'version': 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "colored": {
+            "format": "\033[36m[SQL] %(message)s\033[0m",  
+            # \033[36m = cyan, \033[0m = reset
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            "formatter": "colored",
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+
+
+
