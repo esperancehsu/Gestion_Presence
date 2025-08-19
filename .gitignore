@@ -57,3 +57,7 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
