@@ -27,8 +27,10 @@ schema_view = get_schema_view(
 
 # On définit la liste des URL disponibles dans notre projet Django.
 urlpatterns = [
-    path('admin/', admin.site.urls),               
+    path('admin/', admin.site.urls),    
+    path('users/', include('users.urls')),  # On inclut les URLs de l'application users sous le préfixe /users/
     path('api/', include(router.urls)),            # On inclut tout les URLs générées par le router sous le préfixe /api/
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'), 
-    path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),            
+    path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),  
+              
 ]
