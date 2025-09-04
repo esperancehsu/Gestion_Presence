@@ -1,99 +1,69 @@
-from django.shortcuts import render
-
+# users/views.py
+from rest_framework import generics, status
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed
-
-import jwt, datetime
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
-from .serializers import UserSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from .permissions import IsAdmin, IsModerator, IsUser
 
-# Create your views here.
-def home(request):
-    return render(request, 'home/index.html')
+# Inscription
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
 
-class RegisterView(APIView):
-    def post(self, request):
-        # Logic for user registration
-        data = request.data
-        # Assume we have a User model and a serializer for it
-        
-        
-        serializer = UserSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+# Connexion
 class LoginView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
-        email = request.data['email']
-        password = request.data['password']
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data
 
+        refresh = RefreshToken.for_user(user)
 
-        user = User.objects.filter(email=email).first()
+        return Response({
+            "user": UserSerializer(user).data,
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        })
 
-        if user is None:
-            raise AuthenticationFailed('Utilisateur not found')
-        
-        if not user.check_password(password):
-            raise AuthenticationFailed("incorrecte password")
-        
-
-        payload = {
-            'id': user.id,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=66),
-            'iat': datetime.datetime.utcnow(),
-        }
-
-        # jwt.encode returns a string in PyJWT >=2.x, so no need to decode
-
-        token = jwt.encode(payload, 'secret', algorithm='HS256')
-
-        response =  Response()
-        response.set_cookie(key='jwt', value=token, httponly=True)
-
-        response.data = {
-
-            "jwt": token
-
-        }
-
-        return response
-
+# Infos utilisateur connecté
 class UserView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        token = request.COOKIES.get('jwt')
+        return Response(UserSerializer(request.user).data)
 
-        if not token:
-            raise AuthenticationFailed('ANAUTHENTICATED')
-        
-        try:
-            payload = jwt.decode(token, algorithms=['hs256'])
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('ANAUTHENTICATED')
-        
-        #user = User.objects.get(payload('id'))
-        user = User.objects.filter(id=payload['id']).first()
-
-        serializers = UserSerializer(user)
-
-        return Response(serializers.data)
-
-        #return Response(user)
-
-        #return Response(token)
-
-
+# Déconnexion
 class LogoutView(APIView):
-    def post(self, request):
-        response = Response()
-        response.delete_cookie('jwt')
-        response.data = {
-            'message': 'Success'
-        }
+    permission_classes = [IsAuthenticated]
 
-        return response
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Déconnexion réussie"}, status=status.HTTP_205_RESET_CONTENT)
+        except Exception:
+            return Response({"error": "Token invalide"}, status=status.HTTP_400_BAD_REQUEST)
+
+# Routes avec rôles
+class AdminOnlyView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+    def get(self, request):
+        return Response({"message": "Bienvenue Admin!"})
+
+class ModeratorOnlyView(APIView):
+    permission_classes = [IsAuthenticated, IsModerator]
+    def get(self, request):
+        return Response({"message": "Bienvenue Moderator!"})
+
+class UserOnlyView(APIView):
+    permission_classes = [IsAuthenticated, IsUser]
+    def get(self, request):
+        return Response({"message": "Bienvenue User!"})
