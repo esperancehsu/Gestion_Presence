@@ -30,7 +30,12 @@ urlpatterns = [
     path('admin/', admin.site.urls),    
     path('users/', include('users.urls')),  # On inclut les URLs de l'application users sous le préfixe /users/
     path('api/', include(router.urls)),            # On inclut tout les URLs générées par le router sous le préfixe /api/
+    path('api/auth/', include('users.urls')),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'), 
     path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),  
               
 ]
+
+
+
+
