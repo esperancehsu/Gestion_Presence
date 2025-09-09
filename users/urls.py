@@ -1,13 +1,19 @@
-# users/urls.py
 from django.urls import path
-from .views import RegisterView, LoginView, UserView, LogoutView, AdminOnlyView, ModeratorOnlyView, UserOnlyView
+from .views import (
+    UserRegisterView,
+    UserLoginView,
+    RefreshTokenView,
+    UserListView,
+    ProtectedView,
+    UserLogoutView
+)
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name="register"),
-    path('login/', LoginView.as_view(), name="login"),
-    path('user/', UserView.as_view(), name="user"),
-    path('logout/', LogoutView.as_view(), name="logout"),
-    path('admin-only/', AdminOnlyView.as_view(), name="admin-only"),
-    path('moderator-only/', ModeratorOnlyView.as_view(), name="moderator-only"),
-    path('user-only/', UserOnlyView.as_view(), name="user-only"),
+    path('register/', UserRegisterView.as_view(), name='user-register'),
+    path('login/', UserLoginView.as_view(), name='user-login'),
+    path('refresh/', RefreshTokenView.as_view(), name='token-refresh'),
+    path('list/', UserListView.as_view(), name='user-list'),         # Admin seulement
+    path('protected/', ProtectedView.as_view(), name='protected'),  # Exemple endpoint protégé
+    path('logout/', UserLogoutView.as_view(), name='user-logout'),  # Déconnexion
+
 ]

@@ -1,63 +1,58 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from django.utils import timezone
+# core/views.py
+from rest_framework import generics
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from api.models import Employe
 from api.serializers import EmployeSerializer
+from core.mixins import PermissionMixin
 
+# -------------------------
+# Employe Views avec PermissionMixin
+# -------------------------
+class EmployeListCreateAPIView(PermissionMixin, generics.ListCreateAPIView):
+    """
+    List et création d'employés.
+    RBAC : admin/manager → accès complet
+    Staff → accès limité à son propre profil
+    """
 
-
-# ModelViewSet fourni automatiquement méthodes list, create, retrieve, update, destroy. 
-
-# par la suite on fera avec APIView et le decorator api_view aussi
-
-class EmployeViewSet(viewsets.ModelViewSet):
-    # On définit la requête de base : tous les employés en base.
     queryset = Employe.objects.all()
-    # On indique quel serializer utiliser pour convertir les données.
     serializer_class = EmployeSerializer
+    queryset = Employe.objects.all()
+    required_permission = "can_view_all_employees"  # RBAC
+    allowed_groups = ["Managers", "RH"]  # GBAC facultatif
+
+    def get_queryset(self):
+        """
+        DRY : PermissionMixin filtre automatiquement via RBAC + ABAC + GBAC
+        """
+        return super().get_queryset()
 
     
-    @action(detail=True, methods=['post'], url_path='enregistrer_arrivee')
-    def enregistrer_arrivee(self, request, pk=None):
-        """
-        On crée ou récupère une présence pour la date du jour de cet employé.
-        On met à jour l'heure d'arrivée avec l'heure actuelle.
-        """
-       
-        employe = self.get_object()
-       
-        today = timezone.localdate()
-       
-        presence, created = Presence.objects.get_or_create(employe=employe, date=today)
-       
-        presence.heure_arrivee = timezone.now()
-        presence.save()
-       
-        serializer = PresenceSerializer(presence)
-       
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    
-    @action(detail=True, methods=['post'], url_path='enregistrer_sortie')
-    def enregistrer_sortie(self, request, pk=None):
-        """
-        On cherche la dernière présence du jour pour l'employé qui n'a pas d'heure de sortie.
-        On met à jour l'heure de sortie avec l'heure actuelle.
-        """
-        employe = self.get_object()
-        today = timezone.localdate()
-        try:
-            # On récupère la dernière présence du jour (triée par id décroissant).
-            presence = Presence.objects.filter(employe=employe, date=today).order_by('-id').first()
-            # Si aucune présence trouvée, on renvoie une erreur 404.
-            if not presence:
-                return Response({"detail": "Aucune présence trouvée pour aujourd'hui."}, status=status.HTTP_404_NOT_FOUND)
-            # On met à jour l'heure de sortie.
-            presence.heure_sortie = timezone.now()
-            presence.save()
-            serializer = PresenceSerializer(presence)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except Presence.DoesNotExist:
-            # En cas d'exception, on renvoie un message d'erreur.
-            return Response({"detail": "Aucune présence trouvée."}, status=status.HTTP_404_NOT_FOUND)
+    def perform_create(self, serializer):
+        # Vérifie si un employé existe déjà pour cet utilisateur
+        if Employe.objects.filter(user=self.request.user).exists():
+            raise ValidationError({
+                "user": ["Un employé existe déjà pour cet utilisateur."]
+            })
+
+        # Vérifie si l'utilisateur est Staff
+        if self.request.user.groups.filter(name="Staff").exists():
+            raise PermissionDenied("Un staff ne peut pas créer d'autres employés.")
+
+        # Sauvegarde l'employé avec l'utilisateur courant
+        serializer.save(user=self.request.user)
+
+
+class EmployeRetrieveUpdateDestroyAPIView(PermissionMixin, generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve / Update / Destroy d'un employé.
+    RBAC : admin/manager → accès complet
+    Staff → accès seulement à ses propres données (ABAC)
+    """
+    serializer_class = EmployeSerializer
+    required_permission = "can_manage_employee"  # RBAC
+    allowed_groups = ["Managers"]  # GBAC facultatif
+    abac_check = True  # appliquer ABAC sur l'objet
+
+    queryset = Employe.objects.all()

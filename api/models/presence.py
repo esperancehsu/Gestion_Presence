@@ -2,30 +2,43 @@ from django.db import models
 from django.utils import timezone  
 from .employe import Employe
 
-# On crée la classe Presence qui représente la présence d'un employé un jour donné.
 class Presence(models.Model):
-    # La date de la présence, par défaut la date du jour au moment de la création.
+    STATUS_CHOICES = [
+        ("absent", "Absent"),
+        ("arrive", "Arrivé"),
+        ("sorti", "Sorti"),
+    ]
+
+    employe = models.ForeignKey(Employe, related_name="presences", on_delete=models.CASCADE)
     date = models.DateField(default=timezone.localdate)
-    # L'heure d'arrivée (optionnelle au départ, peut être nulle).
     heure_arrivee = models.DateTimeField(null=True, blank=True)
-    # L'heure de sortie (optionnelle aussi).
     heure_sortie = models.DateTimeField(null=True, blank=True)
+    statut = models.CharField(max_length=10, choices=STATUS_CHOICES, default="absent")
+    note = models.TextField(blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    # Relation avec l'employé : une présence appartient à un employé.
-    # related_name='presences' permet d'accéder aux présences depuis un Employe.
-    employe = models.ForeignKey(Employe, related_name='presences', on_delete=models.CASCADE)
+    class Meta:
+        unique_together = ("employe", "date")  # une présence par employé / jour
 
-    # Méthode pour enregistrer l'heure d'arrivée à l'instant présent.
     def enregistrer_arrivee(self):
+        if self.heure_arrivee:
+            raise ValueError("Arrivée déjà enregistrée.")
         self.heure_arrivee = timezone.now()
-        self.save()
+        self.statut = "arrive"
+        self.save(update_fields=["heure_arrivee", "statut", "updated_at"])
 
-    # Méthode pour enregistrer l'heure de sortie à l'instant présent.
     def enregistrer_sortie(self):
+        if not self.heure_arrivee:
+            raise ValueError("Impossible d'enregistrer la sortie : arrivée non enregistrée.")
+        if self.heure_sortie:
+            raise ValueError("Sortie déjà enregistrée.")
         self.heure_sortie = timezone.now()
-        self.save()
+        self.statut = "sorti"
+        self.save(update_fields=["heure_sortie", "statut", "updated_at"])
 
-    # Affichage textuel d'une présence (exemple : "Jean Dupont - 2025-08-09").
     def __str__(self):
-        return f"{self.employe.nom} - {self.date}"
+        return f"{self.employe.nom} - {self.date} - {self.get_statut_display()}"
+
+

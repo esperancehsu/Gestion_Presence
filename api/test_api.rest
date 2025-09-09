@@ -1,0 +1,53 @@
+### 1️⃣ Inscription d'un nouvel utilisateur
+POST http://127.0.0.1:8000/api/users/register/
+Content-Type: application/json
+
+{
+  "username": "didacticiel",
+  "email": "didacticiel@exemplegmail.com",
+  "password": "root1234@"
+}
+
+### 2️⃣ Login pour récupérer Access + Refresh tokens
+POST http://127.0.0.1:8000/api/users/login/
+Content-Type: application/json
+
+{
+  "identifier": "didacticiel",
+  "password": "mongestion_presence23@"
+}
+
+### 3️⃣ Utiliser l'Access Token pour accéder à un endpoint protégé
+GET http://127.0.0.1:8000/api/users/protected/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzM3MDg5LCJpYXQiOjE3NTczMzYxODksInR5cGUiOiJhY2Nlc3MifQ.ou3BBahIJUl4eDnIvbyL7Qu2yq2fUbD5XJGfRtKHzxY
+
+### 4️⃣ Tester la route Refresh Token
+POST http://127.0.0.1:8000/api/users/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3OTQxMTMzLCJpYXQiOjE3NTczMzYzMzMsInR5cGUiOiJyZWZyZXNoIn0.zGhLOqbmEAyVA8ae_Zmn4-rWMPXhzJ3q28iSo_QJGd4"
+}
+
+### 5️⃣ Tester la liste des utilisateurs (admin only)
+GET http://127.0.0.1:8000/api/users/list/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzM5MTI3LCJpYXQiOjE3NTczMzgyMjcsInR5cGUiOiJhY2Nlc3MifQ.zwfmYs67cXFAZuWQOCteiY6D7j0v9Jo53SyYJURhBDc
+### 6️⃣ Déconnexion
+POST http://127.0.0.1:8000/api/users/logout/
+
+### 7️⃣ Accéder à la liste des employés (endpoint protégé)
+GET http://127.0.0.1:8000/api/employes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzQwODM2LCJpYXQiOjE3NTczMzk5MzYsInR5cGUiOiJhY2Nlc3MifQ.LTMWLjsoZO1tTC_LtPxMIbnCFI6q4mt4PefH6mrm8g0
+
+### 8️⃣ Ajouter un employé (endpoint protégé, RBAC)
+POST http://127.0.0.1:8000/api/employes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzQzMTM1LCJpYXQiOjE3NTczNDIyMzUsInR5cGUiOiJhY2Nlc3MifQ.4fH6oY_yfdPq8Ll7rk3zIaviSCEbdygaJBF4y1d5ZkI
+Content-Type: application/json
+
+{
+  "nom": "Diallo2",
+  "prenom": "Moussa2",
+  "email": "moussa2@gmail.com",
+  "poste": "Développeur",
+  "telephone": "+22997000002"
+}

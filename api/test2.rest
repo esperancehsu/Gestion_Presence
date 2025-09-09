@@ -1,0 +1,23 @@
+POST http://127.0.0.1:8000/api/users/register/
+Content-Type: application/json
+
+{
+  "username": "didacticiel",
+  "email": "didacticiel@example.com",
+  "password": "mongestion_presence23@"
+}
+###
+POST http://127.0.0.1:8000/api/users/login/
+Content-Type: application/json
+
+{
+  "identifier": "didacticiel",
+  "password": "mongestion_presence23@"
+}
+
+
+
+###
+
+GET http://127.0.0.1:8000/api/employes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzM4OTk4LCJpYXQiOjE3NTczMzgwOTgsInR5cGUiOiJhY2Nlc3MifQ.axEY9y2_n7uindplf7FgTaVLI9mAOoviZQzG2v4uTN4

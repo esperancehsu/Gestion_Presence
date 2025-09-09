@@ -1,28 +1,23 @@
+# core/models.py
+from django.conf import settings
 from django.db import models
-from django.utils import timezone   
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-class Employe(models.Model):    
-    
-    ROLES = [
-        ('admin', 'Administrateur'),
-        ('staff', 'Employé'),
-    ]
-  
-    nom = models.CharField(max_length=100)
-  
-    email = models.EmailField(unique=True)
+User = get_user_model()
 
-    # ici , on a le rôle de l'employé, 'admin' ou 'staff'
-    role = models.CharField(max_length=20, choices=ROLES, default='staff')
+class Employe(models.Model):
+    # Lier l'employé au User pour centraliser le rôle et l'authentification
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employe")
+    nom = models.CharField(max_length=150)
+    poste = models.CharField(max_length=150, blank=True)
+    telephone = models.CharField(max_length=30, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
 
-    
-    def voir_historique(self):
-        
-
-        # On utilise related_name 'presences'  de le modèle Presence pour récupérer les présences.
-        return self.presences.all()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True) 
 
     def __str__(self):
-        return self.nom
+        return self.nom or self.user.username
 
-    
+

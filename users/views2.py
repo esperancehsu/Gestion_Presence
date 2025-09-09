@@ -6,19 +6,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from .serializers import UserSerializer
 from .authentication import JWTAuthentication
-from rest_framework.permissions import AllowAny
-
+from .permissions import IsAdmin
 import datetime, jwt
-
-from core.mixins import PermissionMixin
-from rest_framework.exceptions import PermissionDenied
-
-
-
 
 User = get_user_model()
 SECRET_KEY = settings.SECRET_KEY
-
 
 # ---------------- Register ----------------
 class UserRegisterView(APIView):
@@ -32,9 +24,6 @@ class UserRegisterView(APIView):
 
 # ---------------- Login ----------------
 class UserLoginView(APIView):
-    authentication_classes = []  # Pas besoin de token pour se connecter
-    permission_classes = [AllowAny]
-
     def post(self, request):
         identifier = request.data.get("identifier")
         password = request.data.get("password")
@@ -111,10 +100,8 @@ class RefreshTokenView(APIView):
 
 
 # ---------------- Protected View ----------------
-class ProtectedView(PermissionMixin, APIView):
+class ProtectedView(APIView):
     authentication_classes = [JWTAuthentication]
-    required_permission = "can_view_protected"
-    abac_check = True
 
     def get(self, request):
         user = request.user
@@ -125,37 +112,53 @@ class ProtectedView(PermissionMixin, APIView):
 
 
 # ---------------- User Liste (admin only) ----------------
-class UserListView(PermissionMixin, APIView):
+class UserListView(APIView):
     authentication_classes = [JWTAuthentication]
-    allowed_groups = ["admin"]
-    abac_check = False
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         users = User.objects.all()
         return Response(UserSerializer(users, many=True).data)
 
 
-# ---------------- User Detail ----------------
-class UserDetailView(PermissionMixin,APIView):
-    
-    authentication_classes = [JWTAuthentication]
-    required_permission = "can_view_user_detail"
-    abac_check = True
+class UserDetailView(APIView):
 
+    
     def get(self, request):
-        user = request.user
+        token = request.headers.get("Authorization")
+        if not token or not token.startswith("Bearer "):
+            raise AuthenticationFailed("Token manquant")
+
+        token = token.split(" ")[1]
+
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed("Access token expiré")
+        except jwt.InvalidTokenError:
+            raise AuthenticationFailed("Token invalide")
+
+        if payload.get("type") != "access":
+            raise AuthenticationFailed("Ce n'est pas un access token")
+
+        user = User.objects.filter(id=payload["id"]).first()
+        if not user:
+            raise AuthenticationFailed("Utilisateur not fund")
+
         return Response({
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            # "status": user.status  # ⚠️ Supprimé car inexistant dans User par défaut
+            "status": user.status
         })
 
-
-# ---------------- Logout ----------------
 class UserLogoutView(APIView):
+
+ 
     def post(self, request):
         response = Response()
         response.delete_cookie("jwt")
-        response.data = {"message": "Déconnexion réussie"}
+        response.data = {
+            "message": "Déconnexion réussie"
+        }
         return response
