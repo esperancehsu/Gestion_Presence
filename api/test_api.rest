@@ -3,8 +3,8 @@ POST http://127.0.0.1:8000/api/users/register/
 Content-Type: application/json
 
 {
-  "username": "didacticiel",
-  "email": "didacticiel@exemplegmail.com",
+  "username": "didacticiel3",
+  "email": "didacticiel3@exemplegmail.com",
   "password": "root1234@"
 }
 

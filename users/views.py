@@ -22,8 +22,14 @@ SECRET_KEY = settings.SECRET_KEY
 
 # ---------------- Register ----------------
 class UserRegisterView(APIView):
+    authentication_classes = []  # Pas besoin de token pour s'inscrire
+    permission_classes = [AllowAny]  # Permet à n'importe qui de s'inscrire
+
+    
+    
     def post(self, request):
         serializer = UserSerializer(data=request.data)
+
         if serializer.is_valid():
             user = serializer.save()
             return Response({"user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
@@ -32,7 +38,8 @@ class UserRegisterView(APIView):
 
 # ---------------- Login ----------------
 class UserLoginView(APIView):
-    authentication_classes = []  # Pas besoin de token pour se connecter
+    
+    authentication_classes = [JWTAuthentication]  # Pas besoin de token pour se connecter
     permission_classes = [AllowAny]
 
     def post(self, request):
