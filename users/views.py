@@ -1,68 +1,46 @@
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from .serializers import UserSerializer
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from .serializers import UserSerializer, LoginSerializer
 from .authentication import JWTAuthentication
-from rest_framework.permissions import AllowAny
-
 import datetime, jwt
-
-from core.mixins import PermissionMixin
-from rest_framework.exceptions import PermissionDenied
-
-
-
 
 User = get_user_model()
 SECRET_KEY = settings.SECRET_KEY
 
 
-# ---------------- Register ----------------
 class UserRegisterView(APIView):
-    authentication_classes = []  # Pas besoin de token pour s'inscrire
-    permission_classes = [AllowAny]  # Permet à n'importe qui de s'inscrire
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
-    
-    
     def post(self, request):
         serializer = UserSerializer(data=request.data)
-
         if serializer.is_valid():
-            user = serializer.save()
+            user = serializer.save()  # Rôle forcé à "staff" dans le serializer
             return Response({"user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# ---------------- Login ----------------
 class UserLoginView(APIView):
-    
-    authentication_classes = [JWTAuthentication]  # Pas besoin de token pour se connecter
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
-        identifier = request.data.get("identifier")
-        password = request.data.get("password")
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if not identifier or not password:
-            raise AuthenticationFailed("Identifiant et mot de passe requis")
+        user = serializer.validated_data['user']
 
-        # Vérifier username ou email
-        if "@" in identifier:
-            user = User.objects.filter(email__iexact=identifier).first()
-        else:
-            user = User.objects.filter(username__iexact=identifier).first()
-
-        if not user or not user.check_password(password):
-            raise AuthenticationFailed("Identifiant ou mot de passe invalide")
-
-        # Générer Access + Refresh tokens
         now = datetime.datetime.utcnow()
         access_payload = {
             "id": user.id,
-            "exp": now + datetime.timedelta(minutes=15),
+            "exp": now + datetime.timedelta(days=5),
             "iat": now,
             "type": "access"
         }
@@ -85,7 +63,6 @@ class UserLoginView(APIView):
         return response
 
 
-# ---------------- Refresh Token ----------------
 class RefreshTokenView(APIView):
     def post(self, request):
         refresh_token = request.data.get("refresh")
@@ -106,6 +83,9 @@ class RefreshTokenView(APIView):
         if not user:
             raise AuthenticationFailed("Utilisateur introuvable")
 
+        if not user.is_active:
+            raise AuthenticationFailed("Compte désactivé")
+
         now = datetime.datetime.utcnow()
         new_access_payload = {
             "id": user.id,
@@ -117,37 +97,9 @@ class RefreshTokenView(APIView):
         return Response({"access": new_access_token})
 
 
-# ---------------- Protected View ----------------
-class ProtectedView(PermissionMixin, APIView):
+class UserDetailView(APIView):
     authentication_classes = [JWTAuthentication]
-    required_permission = "can_view_protected"
-    abac_check = True
-
-    def get(self, request):
-        user = request.user
-        return Response({
-            "message": "Accès autorisé",
-            "user": UserSerializer(user).data
-        })
-
-
-# ---------------- User Liste (admin only) ----------------
-class UserListView(PermissionMixin, APIView):
-    authentication_classes = [JWTAuthentication]
-    allowed_groups = ["admin"]
-    abac_check = False
-
-    def get(self, request):
-        users = User.objects.all()
-        return Response(UserSerializer(users, many=True).data)
-
-
-# ---------------- User Detail ----------------
-class UserDetailView(PermissionMixin,APIView):
-    
-    authentication_classes = [JWTAuthentication]
-    required_permission = "can_view_user_detail"
-    abac_check = True
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
@@ -155,14 +107,22 @@ class UserDetailView(PermissionMixin,APIView):
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            # "status": user.status  # ⚠️ Supprimé car inexistant dans User par défaut
+            "role": user.role
         })
 
 
-# ---------------- Logout ----------------
 class UserLogoutView(APIView):
     def post(self, request):
         response = Response()
         response.delete_cookie("jwt")
         response.data = {"message": "Déconnexion réussie"}
         return response
+
+
+class UserListView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]  
+
+    def get(self, request):
+        users = User.objects.all()
+        return Response(UserSerializer(users, many=True).data)

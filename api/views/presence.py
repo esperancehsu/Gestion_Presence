@@ -1,110 +1,137 @@
-
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
+from django.db import transaction
 
-from api.models import Presence
+from api.models import Presence, Employe
 from api.serializers import PresenceSerializer
-from core.mixins import PermissionMixin
+from users.authentication import JWTAuthentication
 
 
-
-# -------------------------
-# ----------------------------------------------- on code avec sourir :)
-# -------------------------
-class PresenceListCreateAPIView(PermissionMixin, generics.ListCreateAPIView):
-    serializer_class = PresenceSerializer
+class PresenceListCreateAPIView(generics.ListCreateAPIView):
+    """Liste et création de présences."""
     queryset = Presence.objects.all()
-    required_permission = "can_manage_presence"  # RBAC
-    allowed_groups = ["Managers", "RH"]         # GBAC
-    abac_check = True
+    serializer_class = PresenceSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        #qs = super().get_queryset().order_by("-date", "-created_at")
-        qs = super().get_queryset().select_related('employe__user').order_by("-date", "-created_at")
-        return qs
+        qs = super().get_queryset().select_related('employe__user').prefetch_related('employe')
+        
+        if user.is_admin or user.is_manager or user.is_rh:
+            return qs
+        
+        # Staff voit seulement ses présences
+        return qs.filter(employe__user=user)
 
     def perform_create(self, serializer):
         user = self.request.user
-        is_admin = getattr(user, "role", None) == "admin" or user.is_superuser
-
-        if is_admin:
-            # Admin / Manager → création libre
-            serializer.save()
-            return
-
-        # Staff : on crée uniquement sa présence du jour
-        employe = getattr(user, "employe", None)
-        if not employe:
-            raise ValidationError("Votre compte n'est pas associé à un employé.")
-
-        today = timezone.localdate()
-        if Presence.objects.filter(employe=employe, date=today).exists():
-            raise ValidationError("Présence du jour déjà créée.")
-
-        serializer.save(employe=employe, date=today)
-
-
-# -------------------------
-# Presence Retrieve / Update / Destroy
-# -------------------------
-class PresenceDetailAPIView(PermissionMixin, generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = PresenceSerializer
-    queryset = Presence.objects.all()
-    required_permission = "can_manage_presence"
-    allowed_groups = ["Managers", "RH"]
-    abac_check = True
-
-    def perform_update(self, serializer):
-        user = self.request.user
-        is_admin = getattr(user, "role", None) == "admin" or user.is_superuser
-        presence = self.get_object()
-
-        if is_admin:
-            serializer.save()
-            return
-
-        # Staff : uniquement sa présence du jour
-        if presence.employe.user != user or presence.date != timezone.localdate():
-            raise PermissionDenied("Vous ne pouvez modifier que votre présence du jour.")
-
+        
+        # Vérifier la permission
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        # Pour staff, vérifier qu'il n'a pas déjà une présence aujourd'hui
+        if not (user.is_admin or user.is_manager or user.is_rh):
+            try:
+                employe = user.employe
+                today = timezone.localdate()
+                if Presence.objects.filter(employe=employe, date=today).exists():
+                    raise ValidationError("Vous avez déjà une présence pour aujourd'hui.")
+            except Employe.DoesNotExist:
+                raise ValidationError("Votre compte n'est pas associé à un employé.")
+        
         serializer.save()
 
 
-    def perform_destroy(self, instance):
-        user = self.request.user
-        is_admin = getattr(user, "role", None) == "admin" or user.is_superuser
-        if not is_admin:
-            raise PermissionDenied("Seul l'administrateur peut supprimer une présence.")
-        instance.delete()
+class PresenceDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """Détail, modification et suppression d'une présence."""
+    serializer_class = PresenceSerializer
+    queryset = Presence.objects.all()
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-       return super().get_queryset().select_related('employe__user').order_by("-date", "-created_at")
+        user = self.request.user
+        qs = super().get_queryset().select_related('employe__user')
+        
+        if user.is_admin or user.is_manager or user.is_rh:
+            return qs
+        
+        return qs.filter(employe__user=user)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        presence = self.get_object()
+        
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        # Staff ne peut modifier que sa présence du jour
+        if not (user.is_admin or user.is_manager or user.is_rh):
+            if presence.employe.user != user or presence.date != timezone.localdate():
+                raise PermissionDenied("Vous ne pouvez modifier que votre présence du jour.")
+        
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        if not user.is_admin:
+            raise PermissionDenied("Seul l'administrateur peut supprimer une présence.")
+        
+        instance.delete()
 
 
-# -------------------------
-# Présence Arrivée / Sortie (spécifique)
-# -------------------------
-class PresenceArriveeAPIView(PermissionMixin, APIView):
-    required_permission = "can_manage_presence"
-    allowed_groups = ["Managers", "RH"]
+class PresenceArriveeAPIView(APIView):
+    """Marquer l'arrivée."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request, pk):
-        presence = Presence.objects.select_related('employe__user').filter(pk=pk).first()
-        if not presence:
-            raise NotFound("Présence introuvable.")
-
+    def post(self, request, pk=None):
         user = request.user
-        is_admin = getattr(user, "role", None) == "admin" or user.is_superuser
+        
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        # Si pk fourni, récupérer la présence spécifique
+        if pk:
+            try:
+                presence = Presence.objects.select_related('employe__user').get(pk=pk)
+            except Presence.DoesNotExist:
+                raise NotFound("Présence introuvable.")
+            
+            # Vérifier les permissions pour cette présence
+            if not (user.is_admin or user.is_manager or user.is_rh):
+                if presence.employe.user != user or presence.date != timezone.localdate():
+                    raise PermissionDenied("Vous ne pouvez marquer l'arrivée que pour votre présence du jour.")
+        else:
+            # Créer ou récupérer la présence du jour pour l'utilisateur
+            if user.is_admin or user.is_manager or user.is_rh:
+                raise ValidationError("Les administrateurs doivent spécifier un ID de présence.")
+            
+            try:
+                employe = user.employe
+                today = timezone.localdate()
+                presence, created = Presence.objects.get_or_create(
+                    employe=employe,
+                    date=today,
+                    defaults={'statut': 'absent'}
+                )
+            except Employe.DoesNotExist:
+                raise ValidationError("Votre compte n'est pas associé à un employé.")
 
-        if not is_admin and (not hasattr(user, "employe") or presence.employe.user != user or presence.date != timezone.localdate()):
-            raise PermissionDenied("Vous ne pouvez marquer l'arrivée que pour votre propre présence du jour.")
-
+        # Enregistrer l'arrivée
         try:
-            presence.enregistrer_arrivee()
+            with transaction.atomic():
+                presence.enregistrer_arrivee()
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -112,25 +139,93 @@ class PresenceArriveeAPIView(PermissionMixin, APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class PresenceSortieAPIView(PermissionMixin, APIView):
-    required_permission = "can_manage_presence"
-    allowed_groups = ["Managers", "RH"]
+class PresenceSortieAPIView(APIView):
+    """Marquer la sortie."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request, pk):
-        presence = Presence.objects.select_related('employe__user').filter(pk=pk).first()
-        if not presence:
-            raise NotFound("Présence introuvable.")
-
+    def post(self, request, pk=None):
         user = request.user
-        is_admin = getattr(user, "role", None) == "admin" or user.is_superuser
+        
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        # Si pk fourni, récupérer la présence spécifique
+        if pk:
+            try:
+                presence = Presence.objects.select_related('employe__user').get(pk=pk)
+            except Presence.DoesNotExist:
+                raise NotFound("Présence introuvable.")
+            
+            # Vérifier les permissions pour cette présence
+            if not (user.is_admin or user.is_manager or user.is_rh):
+                if presence.employe.user != user or presence.date != timezone.localdate():
+                    raise PermissionDenied("Vous ne pouvez marquer la sortie que pour votre présence du jour.")
+        else:
+            # Récupérer la présence du jour pour l'utilisateur
+            if user.is_admin or user.is_manager or user.is_rh:
+                raise ValidationError("Les administrateurs doivent spécifier un ID de présence.")
+            
+            try:
+                employe = user.employe
+                today = timezone.localdate()
+                presence = Presence.objects.get(employe=employe, date=today)
+            except (Employe.DoesNotExist, Presence.DoesNotExist):
+                raise NotFound("Aucune présence trouvée pour aujourd'hui.")
 
-        if not is_admin and (not hasattr(user, "employe") or presence.employe.user != user or presence.date != timezone.localdate()):
-            raise PermissionDenied("Vous ne pouvez marquer la sortie que pour votre propre présence du jour.")
-
+        # Enregistrer la sortie
         try:
-            presence.enregistrer_sortie()
+            with transaction.atomic():
+                presence.enregistrer_sortie()
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = PresenceSerializer(presence, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MaPresenceAPIView(APIView):
+    """Endpoints pour la présence de l'utilisateur connecté."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Récupérer ma présence du jour."""
+        user = request.user
+        
+        try:
+            employe = user.employe
+            today = timezone.localdate()
+            presence = Presence.objects.get(employe=employe, date=today)
+            serializer = PresenceSerializer(presence, context={"request": request})
+            return Response(serializer.data)
+        except Employe.DoesNotExist:
+            return Response({"detail": "Votre compte n'est pas associé à un employé."}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        except Presence.DoesNotExist:
+            return Response({"detail": "Aucune présence pour aujourd'hui."}, 
+                          status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        """Créer ma présence du jour."""
+        user = request.user
+        
+        if not user.has_perm("api.can_manage_presence"):
+            raise PermissionDenied("Vous n'avez pas la permission de gérer les présences.")
+        
+        try:
+            employe = user.employe
+            today = timezone.localdate()
+            
+            if Presence.objects.filter(employe=employe, date=today).exists():
+                return Response({"detail": "Présence déjà créée pour aujourd'hui."}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            presence = Presence.objects.create(employe=employe, date=today)
+            serializer = PresenceSerializer(presence, context={"request": request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Employe.DoesNotExist:
+            return Response({"detail": "Votre compte n'est pas associé à un employé."}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+

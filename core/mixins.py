@@ -1,90 +1,74 @@
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from .permissions import RBACPermission, ABACPermission, GBACPermission
+# core/mixins.py
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
-
-
-
+from users.authentication import JWTAuthentication
 
 class PermissionMixin:
-    """
-    Mixin DRY pour appliquer RBAC + ABAC + GBAC sur n'importe quelle vue DRF.
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
-    Usage :
-        class MaVue(PermissionMixin, generics.ListCreateAPIView):
-            required_permission = "can_view_reports"
-            allowed_groups = ["Managers", "RH"]  # facultatif, pour GBAC
-            abac_check = True  # facultatif, par défaut True pour object-level
-    """
-
-    permission_classes = [IsAuthenticated, RBACPermission]
-    required_permission = None
-    required_permissions = []
-    allowed_groups = []
-    abac_check = True  # On appliquer ABAC sur les objets (RetrieveUpdateDestroy)
-
-    """
-    
-      def get_queryset(self):
-        
-        #Filtre automatique selon RBAC + ABAC + GBAC
-        
-        user = self.request.user
-
-        # RBAC : admin / manager → accès complet
-        if RBACPermission().has_permission(self.request, self):
-            qs = super().get_queryset()
-        else:
-            # Staff → restreint aux objets liés à l'utilisateur
-            qs = super().get_queryset()
-            # ABAC filtrage : objets liés à user
-            if hasattr(qs.model, "user"):
-                qs = qs.filter(user=user)
-            elif hasattr(qs.model, "employe"):
-                qs = qs.filter(employe__user=user)
-        return qs
-    
-    """
-    
     def get_queryset(self):
         user = self.request.user
-        qs = super().get_queryset()  # ← On part du queryset de la vue (déjà optimisé)
 
-        if RBACPermission().has_permission(self.request, self):
-            return qs
+        # Si superuser ou admin → accès complet
+        if user.is_superuser or user.is_admin:
+            return super().get_queryset()
 
+        qs = super().get_queryset()
+
+        # Pour les modèles liés à un User (ex: Employe)
         if hasattr(qs.model, "user"):
-            qs = qs.filter(user=user)
-        elif hasattr(qs.model, "employe"):
-            qs = qs.filter(employe__user=user)
+            return qs.filter(user=user)
+
+        # Pour les modèles liés à un Employe (ex: Presence, Rapport)
+        if hasattr(qs.model, "employe"):
+            return qs.filter(employe__user=user)
 
         return qs
 
     def perform_create(self, serializer):
-        """
-        RBAC + ABAC lors de la création
-        """
         user = self.request.user
+        model_name = serializer.Meta.model.__name__.lower()
 
-        if RBACPermission().has_permission(self.request, self):
-            # Admin / manager → création libre
-            serializer.save()
-        else:
-            # Staff → forcer l'employe lié
+        
+        permission_map = {
+            "employe": "api.can_manage_employee",
+            "presence": "api.can_manage_presence",
+            "rapport": "api.can_generate_reports",
+        }
+
+        required_permission = permission_map.get(model_name)
+        if not required_permission:
+            raise PermissionDenied(f"Permission non définie pour le modèle {model_name}.")
+
+        # Vérifie la permission
+        if not user.has_perm(required_permission):
+            raise PermissionDenied(f"Vous n'avez pas la permission de créer un {model_name}.")
+
+        # Presence → assigne l'employé automatiquement
+        if model_name == "presence":
             employe = getattr(user, "employe", None)
             if not employe:
-                raise ValidationError(
-                    "Votre compte n'est pas associé à un employé. Contactez l'administrateur."
-                )
+                raise PermissionDenied("Votre compte n'est pas associé à un employé.")
             serializer.save(employe=employe)
+        else:
+            serializer.save()
 
-    def get_object(self):
-        """
-        RBAC + ABAC lors de Retrieve/Update/Destroy
-        """
-        obj = super().get_object()
 
-        # ABAC : l'utilisateur ne peut accéder qu'à ses objets
-        if self.abac_check and not ABACPermission().has_object_permission(self.request, self, obj):
-            raise PermissionDenied("Vous n'avez pas la permission d'accéder à cet objet.")
 
-        return obj
+from rest_framework.permissions import AllowAny
+
+class IsAuthenticatedOrSwagger(AllowAny):
+    """
+    Autorise Swagger/Redoc sans auth, impose auth ailleurs.
+    """
+    def has_permission(self, request, view):
+        path = request.path
+        if (
+            path.startswith("/swagger") or 
+            path.startswith("/redoc") or 
+            path.endswith("/swagger.json") or 
+            path.endswith("/swagger.yaml")
+        ):
+            return True
+        return request.user and request.user.is_authenticated

@@ -9,11 +9,20 @@ SECRET_KEY = settings.SECRET_KEY
 
 class JWTAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        token = request.headers.get("Authorization")
-        if not token or not token.startswith("Bearer "):
-            raise AuthenticationFailed("Token manquant")
-        token = token.split(" ")[1]
-
+        # Vérifier d'abord dans les headers Authorization
+        auth_header = request.headers.get("Authorization")
+        token = None
+        
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        else:
+            # Vérifier aussi dans les cookies si pas trouvé dans headers
+            token = request.COOKIES.get("jwt")
+        
+        # Si aucun token n'est trouvé, retournons None 
+        if not token:
+            return None
+        
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         except jwt.ExpiredSignatureError:
@@ -27,4 +36,8 @@ class JWTAuthentication(BaseAuthentication):
         user = User.objects.filter(id=payload["id"]).first()
         if not user:
             raise AuthenticationFailed("Utilisateur introuvable")
+        
+        if not user.is_active:
+            raise AuthenticationFailed("Compte désactivé")
+            
         return (user, token)

@@ -3,35 +3,55 @@ POST http://127.0.0.1:8000/api/users/register/
 Content-Type: application/json
 
 {
-  "username": "didacticiel3",
-  "email": "didacticiel3@exemplegmail.com",
-  "password": "root1234@"
+             "username": "johndoe",
+              "email": "johndoe2@gmail.com",
+              "password": "Mecurepassword123@",
+              "role": "admin" 
 }
 
-### 2️⃣ Login pour récupérer Access + Refresh tokens
+
+###
 POST http://127.0.0.1:8000/api/users/login/
 Content-Type: application/json
+
 
 {
   "identifier": "didacticiel",
   "password": "mongestion_presence23@"
 }
 
-### 3️⃣ Utiliser l'Access Token pour accéder à un endpoint protégé
-GET http://127.0.0.1:8000/api/users/protected/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzM3MDg5LCJpYXQiOjE3NTczMzYxODksInR5cGUiOiJhY2Nlc3MifQ.ou3BBahIJUl4eDnIvbyL7Qu2yq2fUbD5XJGfRtKHzxY
 
-### 4️⃣ Tester la route Refresh Token
-POST http://127.0.0.1:8000/api/users/refresh/
+### 2️⃣ Login pour récupérer Access + Refresh tokens
+POST http://127.0.0.1:8000/api/users/login/
 Content-Type: application/json
 
 {
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3OTQxMTMzLCJpYXQiOjE3NTczMzYzMzMsInR5cGUiOiJyZWZyZXNoIn0.zGhLOqbmEAyVA8ae_Zmn4-rWMPXhzJ3q28iSo_QJGd4"
+  "identifier": "johndoe",
+  "password": "Mecurepassword123@"
 }
+
+###
+GET http://127.0.0.1:8000/api/ma-presence/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImV4cCI6MTc1ODIxNTY0MiwiaWF0IjoxNzU3NzgzNjQyLCJ0eXBlIjoiYWNjZXNzIn0.EaF-w3Fo5bMjYcnOsX-aIYdrNfiTVRYGeT_YJAX0TSA
+
+###
+POST http://127.0.0.1:8000/api/ma-presence/arrivee/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImV4cCI6MTc1ODIxNTY0MiwiaWF0IjoxNzU3NzgzNjQyLCJ0eXBlIjoiYWNjZXNzIn0.EaF-w3Fo5bMjYcnOsX-aIYdrNfiTVRYGeT_YJAX0TSA
+
+###
+POST http://127.0.0.1:8000/api/ma-presence/sortie/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImV4cCI6MTc1ODIxNTY0MiwiaWF0IjoxNzU3NzgzNjQyLCJ0eXBlIjoiYWNjZXNzIn0.EaF-w3Fo5bMjYcnOsX-aIYdrNfiTVRYGeT_YJAX0TSA
+
+
+
+
 
 ### 5️⃣ Tester la liste des utilisateurs (admin only)
 GET http://127.0.0.1:8000/api/users/list/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzM5MTI3LCJpYXQiOjE3NTczMzgyMjcsInR5cGUiOiJhY2Nlc3MifQ.zwfmYs67cXFAZuWQOCteiY6D7j0v9Jo53SyYJURhBDc
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTIsImV4cCI6MTc1ODIwMTk2MSwiaWF0IjoxNzU3NzY5OTYxLCJ0eXBlIjoiYWNjZXNzIn0.nBrBZWqXloJjePftt4qs2xGhWcJzAY4pHp6qUo9IuG0
 ### 6️⃣ Déconnexion
 POST http://127.0.0.1:8000/api/users/logout/
 
@@ -51,3 +71,55 @@ Content-Type: application/json
   "poste": "Développeur",
   "telephone": "+22997000002"
 }
+
+
+
+
+
+
+### 9️⃣ Inscription d'un autre utilisateur (role: admin)
+POST http://127.0.0.1:8000/api/users/register/
+Content-Type: application/json
+
+{
+  "username": "testadmin2",
+  "email": "test2@example.com",
+  "password": "Password123@",
+  "role": "admin"
+}
+### 10️⃣ Login avec le nouvel utilisateur pour récupérer Access + Refresh tokens  
+POST http://127.0.0.1:8000/api/users/login/
+Content-Type: application/json
+
+{
+  "identifier": "Didacticiel",
+  "password": "root"
+}
+### 11️⃣ Ajouter un employé en spécifiant un user existant (endpoint protégé, RBAC)
+GET http://127.0.0.1:8000/api/employes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTIsImV4cCI6MTc1ODE5Njc3NiwiaWF0IjoxNzU3NzY0Nzc2LCJ0eXBlIjoiYWNjZXNzIn0.dx5oThhoNyCTpnax2DsWE7BUrIW554mFxuDb_gGtdH8
+Content-Type: application/json
+
+{
+  "nom": "Admin User",
+  "poste": "Admin",
+  "email": "admin@example.com"
+}
+
+
+
+from django.contrib.auth.models import Group, User
+u = User.objects.get(username="Diallo")
+g = Group.objects.get(name="Staff")
+u.groups.add(g)
+
+
+
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+u = User.objects.get(username="Diallo")
+g = Group.objects.get(name="Staff")
+u.groups.add(g)
+u.groups.all()  

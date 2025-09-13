@@ -1,23 +1,28 @@
-# core/models.py
-from django.conf import settings
+# api/models.py
 from django.db import models
-from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
 class Employe(models.Model):
-    # Lier l'employé au User pour centraliser le rôle et l'authentification
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="employe")
-    nom = models.CharField(max_length=150)
-    poste = models.CharField(max_length=150, blank=True)
-    telephone = models.CharField(max_length=30, blank=True, null=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='employe')
+    nom = models.CharField(max_length=100)
+    poste = models.CharField(max_length=100)
+    telephone = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True) 
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Employé"
+        verbose_name_plural = "Employés"
+        permissions = [
+            ("can_manage_employee", "Peut gérer les employés"),
+            ("can_view_all_employees", "Peut voir tous les employés"),
+        ]
 
     def __str__(self):
-        return self.nom or self.user.username
-
+        return f"{self.nom} - {self.poste}"
 
