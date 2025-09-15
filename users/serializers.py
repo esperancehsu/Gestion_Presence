@@ -27,7 +27,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'password', 'role']
         extra_kwargs = {
             'password': {'write_only': True},
-            'role': {'required': False}  # Optionnel, par défaut 'staff'
+            #'role': {'required': False}  # Optionnel, par défaut 'staff'
         }
 
     def validate_password(self, value):

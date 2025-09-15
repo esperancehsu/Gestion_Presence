@@ -3,11 +3,82 @@ POST http://127.0.0.1:8000/api/users/register/
 Content-Type: application/json
 
 {
-             "username": "johndoe",
-              "email": "johndoe2@gmail.com",
-              "password": "Mecurepassword123@",
-              "role": "admin" 
+  "username": "zidane",
+  "email": "zidane@gmail.com",
+  "password": "Azerty1234@",
+  "role": "staff" 
 }
+###
+POST http://127.0.0.1:8000/api/users/register/
+Content-Type: application/json
+
+{
+  "username": "yacoubou",
+  "email": "yacoubou@gmail.com",
+  "password": "Azerty1234@",
+  "role": "staff" 
+}
+
+###
+POST http://127.0.0.1:8000/api/ma-presence/arrivee/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjQsImV4cCI6MTc1ODI3MTcyMSwiaWF0IjoxNzU3ODM5NzIxLCJ0eXBlIjoiYWNjZXNzIn0.tQVCsbz_hvTQxsORF7JXbDaJqcZvf56U2CvflYR5Cm0
+
+###
+POST http://127.0.0.1:8000/api/ma-presence/sortie/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjQsImV4cCI6MTc1ODI3MTcyMSwiaWF0IjoxNzU3ODM5NzIxLCJ0eXBlIjoiYWNjZXNzIn0.tQVCsbz_hvTQxsORF7JXbDaJqcZvf56U2CvflYR5Cm0
+
+
+###
+GET http://127.0.0.1:8000/api/users/list/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjQsImV4cCI6MTc1ODI3MTcyMSwiaWF0IjoxNzU3ODM5NzIxLCJ0eXBlIjoiYWNjZXNzIn0.tQVCsbz_hvTQxsORF7JXbDaJqcZvf56U2CvflYR5Cm0
+
+###
+GET http://127.0.0.1:8000/api/rapports/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjQsImV4cCI6MTc1ODI3MTcyMSwiaWF0IjoxNzU3ODM5NzIxLCJ0eXBlIjoiYWNjZXNzIn0.tQVCsbz_hvTQxsORF7JXbDaJqcZvf56U2CvflYR5Cm0
+
+### 8️⃣ Ajouter un employé (endpoint protégé, RBAC)
+POST http://127.0.0.1:8000/api/employes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjQsImV4cCI6MTc1ODI3MTcyMSwiaWF0IjoxNzU3ODM5NzIxLCJ0eXBlIjoiYWNjZXNzIn0.tQVCsbz_hvTQxsORF7JXbDaJqcZvf56U2CvflYR5Cm0
+Content-Type: application/json
+
+{
+  "nom": "geno",
+  "prenom": "houessou",
+  "email": "geno@gmail.com",
+  "poste": "Développeuse",
+  "telephone": "+22997000000"
+}
+
+###
+POST http://127.0.0.1:8000/api/employes/
+
+
+
+
+
+
+
+
+
+
+
+
+
+###
+POST http://127.0.0.1:8000/api/users/login/
+Content-Type: application/json
+
+{
+  "identifier": "zidane",
+  "password": "Azerty1234@"
+}
+
+
+
+
+
 
 
 ###
@@ -51,13 +122,17 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImV4cCI6M
 
 ### 5️⃣ Tester la liste des utilisateurs (admin only)
 GET http://127.0.0.1:8000/api/users/list/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTIsImV4cCI6MTc1ODIwMTk2MSwiaWF0IjoxNzU3NzY5OTYxLCJ0eXBlIjoiYWNjZXNzIn0.nBrBZWqXloJjePftt4qs2xGhWcJzAY4pHp6qUo9IuG0
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU4MjYzODIzLCJpYXQiOjE3NTc4MzE4MjMsInR5cGUiOiJhY2Nlc3MifQ.eRUTcndRGHF83beEBx9Ji7xeiOf4OFHw40kexPc2Xao
+
+
 ### 6️⃣ Déconnexion
 POST http://127.0.0.1:8000/api/users/logout/
 
 ### 7️⃣ Accéder à la liste des employés (endpoint protégé)
 GET http://127.0.0.1:8000/api/employes/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzQwODM2LCJpYXQiOjE3NTczMzk5MzYsInR5cGUiOiJhY2Nlc3MifQ.LTMWLjsoZO1tTC_LtPxMIbnCFI6q4mt4PefH6mrm8g0
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZXhwIjoxNzU3MzQzMTM1LCJpYXQiOjE3NTczNDIyMzUsInR5cGUiOiJhY2Nlc3MifQ.4fH6oY_yfdPq8Ll7rk3zIaviSCEbdygaJBF4y1d5ZkI
+
+
 
 ### 8️⃣ Ajouter un employé (endpoint protégé, RBAC)
 POST http://127.0.0.1:8000/api/employes/
@@ -106,6 +181,20 @@ Content-Type: application/json
   "email": "admin@example.com"
 }
 
+###
+POST http://127.0.0.1:8000/api/users/register/
+Content-Type: application/json
+
+{
+  "username": "yacoubou",
+  "email": "yacoubou@gmail.com",
+  "password": "Azerty1234@",
+  "role": "rh"
+}
+
+
+
+
 
 
 from django.contrib.auth.models import Group, User
@@ -119,7 +208,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-u = User.objects.get(username="Diallo")
-g = Group.objects.get(name="Staff")
+u = User.objects.get(username="didacticiel")
+g = Group.objects.get(name="Admin")
 u.groups.add(g)
 u.groups.all()  

@@ -1,12 +1,14 @@
 # core/views.py
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+from rest_framework import status
 from api.models import Employe
 from api.serializers import EmployeSerializer
 from core.mixins import PermissionMixin
 from rest_framework.permissions import IsAuthenticated
 from users.authentication import JWTAuthentication
-
+from rest_framework import serializers  
 
 class EmployeListCreateAPIView(PermissionMixin, generics.ListCreateAPIView):
     """
@@ -22,7 +24,7 @@ class EmployeListCreateAPIView(PermissionMixin, generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = super().get_queryset().select_related('user')  
+        qs = super().get_queryset().select_related('user')
 
         # Si l'utilisateur a la permission de voir tous les employés → accès complet
         if user.has_perm("api.can_view_all_employees"):
@@ -31,22 +33,35 @@ class EmployeListCreateAPIView(PermissionMixin, generics.ListCreateAPIView):
         # Sinon, seulement son propre employé
         return qs.filter(user=user)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def perform_create(self, serializer):
-        user = self.request.user
-
-        # Vérifie si un employé existe déjà pour cet utilisateur
-        if Employe.objects.filter(user=user).exists():
-            raise ValidationError({
-                "user": ["Un employé existe déjà pour cet utilisateur."]
-            })
-
-        # Vérifie la permission de gestion des employés
-        if not user.has_perm("api.can_manage_employee"):
+        # Vérifie la permission de base
+        if not self.request.user.has_perm("api.can_manage_employee"):
             raise PermissionDenied("Vous n'avez pas la permission de créer un employé.")
 
+        # Le serializer gère le reste (assignation de user, validation)
         serializer.save()
 
-
+    def create(self, request, *args, **kwargs):
+        """Override pour un meilleur feedback d'erreur"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except serializers.ValidationError as e:
+            return Response({
+                'error': 'Erreur de validation',
+                'details': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'error': 'Erreur serveur',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+# core/views.py (suite)
 class EmployeRetrieveUpdateDestroyAPIView(PermissionMixin, generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve / Update / Destroy d'un employé.
@@ -61,35 +76,41 @@ class EmployeRetrieveUpdateDestroyAPIView(PermissionMixin, generics.RetrieveUpda
 
     def get_queryset(self):
         user = self.request.user
-        qs = super().get_queryset().select_related('user')  # ← Optimisation N+1
+        qs = super().get_queryset().select_related('user')
 
         if user.has_perm("api.can_view_all_employees"):
             return qs
         return qs.filter(user=user)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def perform_update(self, serializer):
         user = self.request.user
         employe = self.get_object()
 
-        # Vérifie la permission
+        # Vérifie la permission de base
         if not user.has_perm("api.can_manage_employee"):
             raise PermissionDenied("Vous n'avez pas la permission de modifier cet employé.")
 
-        # Si ce n'est pas un admin/RH, l'utilisateur ne peut modifier que son propre profil
-        if not (user.is_admin or user.is_rh) and employe.user != user:
-            raise PermissionDenied("Vous ne pouvez modifier que votre propre profil.")
+        # Vérifie si l'utilisateur peut modifier ce profil spécifique
+        if not (getattr(user, 'is_admin', False) or getattr(user, 'is_rh', False)):
+            if employe.user != user:
+                raise PermissionDenied("Vous ne pouvez modifier que votre propre profil.")
 
         serializer.save()
 
     def perform_destroy(self, instance):
         user = self.request.user
 
-        # Vérifie la permission
         if not user.has_perm("api.can_manage_employee"):
             raise PermissionDenied("Vous n'avez pas la permission de supprimer cet employé.")
 
-        # Si ce n'est pas un admin/RH, l'utilisateur ne peut supprimer que son propre profil
-        if not (user.is_admin or user.is_rh) and instance.user != user:
-            raise PermissionDenied("Vous ne pouvez supprimer que votre propre profil.")
+        # Seul un admin/RH peut supprimer un employé d'un autre
+        if not (getattr(user, 'is_admin', False) or getattr(user, 'is_rh', False)):
+            if instance.user != user:
+                raise PermissionDenied("Vous ne pouvez supprimer que votre propre profil.")
 
         instance.delete()

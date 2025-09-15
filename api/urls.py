@@ -19,7 +19,7 @@ urlpatterns = [
     path("rapports/", RapportListCreateAPIView.as_view(), name="rapport-list-create"),
     path("rapports/<int:pk>/", RapportRetrieveUpdateDestroyAPIView.as_view(), name="rapport-detail"),
 
-    # Presence - URLs existantes
+  
     path("presences/", PresenceListCreateAPIView.as_view(), name="presence-list-create"),
     path("presences/<int:pk>/", PresenceDetailAPIView.as_view(), name="presence-detail"),
     path("presences/<int:pk>/arrivee/", PresenceArriveeAPIView.as_view(), name="presence-arrivee"),

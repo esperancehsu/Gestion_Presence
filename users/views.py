@@ -6,7 +6,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from .serializers import UserSerializer, LoginSerializer
+from .serializers import UserSerializer, LoginSerializer, RegisterSerializer
 from .authentication import JWTAuthentication
 import datetime, jwt
 
@@ -19,7 +19,8 @@ class UserRegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = UserSerializer(data=request.data)
+        #serializer = UserSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             user = serializer.save()  # Rôle forcé à "staff" dans le serializer
             return Response({"user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
