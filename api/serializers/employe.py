@@ -2,38 +2,37 @@
 from rest_framework import serializers
 from api.models import Employe
 from django.contrib.auth import get_user_model
-    
+from users.serializers import UserSerializer
 import traceback
 User = get_user_model()
 
 class EmployeSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
     user_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         source='user',
         write_only=True,
         required=False
     )
-    user = serializers.PrimaryKeyRelatedField(read_only=True)  
-    user_username = serializers.CharField(source='user.username', read_only=True)
-    
+
     class Meta:
         model = Employe
         fields = [
-            'id', 'user', 'user_id', 'user_username',
-            'nom', 'poste', 'telephone', 'email',
-            'created_at', 'updated_at'
+            'id', 'user', 'user_id', 'nom', 'poste',
+            'telephone', 'email', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'user_username', 'user']
+        read_only_fields = ['created_at', 'updated_at']
+
     
 
 
-    def create(self, request, *args, **kwargs):
-       try:
-        return super().create(request, *args, **kwargs)
-       except Exception as e:
-        print(f"Erreur lors de la création: {e}")
-        print(traceback.format_exc())
-        raise
+        def create(self, request, *args, **kwargs):
+            try:
+                return super().create(request, *args, **kwargs)
+            except Exception as e:
+                print(f"Erreur lors de la création: {e}")
+                print(traceback.format_exc())
+                raise
 
 
     def validate(self, data):

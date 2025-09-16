@@ -19,12 +19,16 @@ class UserRegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        #serializer = UserSerializer(data=request.data)
         serializer = RegisterSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            user = serializer.save()  # Rôle forcé à "staff" dans le serializer
-            return Response({"user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            return Response({
+                "message": "Inscription réussie !",
+                "user": UserSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 
 class UserLoginView(APIView):
